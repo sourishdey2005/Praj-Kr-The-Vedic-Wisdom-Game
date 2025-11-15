@@ -2,12 +2,14 @@
 import React, { useState } from 'react';
 import StartScreen from './components/StartScreen';
 import GameScreen from './components/GameScreen';
-import { GameState } from './types';
+import { GameState, Difficulty } from './types';
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(GameState.Start);
+  const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.Medium);
 
-  const startGame = () => {
+  const startGame = (selectedDifficulty: Difficulty) => {
+    setDifficulty(selectedDifficulty);
     setGameState(GameState.Playing);
   };
 
@@ -16,7 +18,7 @@ const App: React.FC = () => {
       case GameState.Start:
         return <StartScreen onStart={startGame} />;
       case GameState.Playing:
-        return <GameScreen />;
+        return <GameScreen difficulty={difficulty} />;
       default:
         return <StartScreen onStart={startGame} />;
     }
@@ -32,4 +34,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-   

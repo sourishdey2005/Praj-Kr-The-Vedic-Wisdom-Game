@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Riddle } from '../types';
+import { Riddle, Difficulty } from '../types';
 
 const API_KEY = process.env.API_KEY;
 
@@ -25,11 +25,26 @@ const riddleSchema = {
   required: ['riddle', 'name'],
 };
 
-export const fetchRiddle = async (): Promise<Riddle> => {
+const getDifficultyPrompt = (difficulty: Difficulty): string => {
+    switch (difficulty) {
+        case Difficulty.Easy:
+            return "Generate a simple and straightforward riddle about a very well-known Rishi (sage) or Deva (deity) from the Vedic scriptures. The answer should be a household name for those familiar with Hinduism.";
+        case Difficulty.Hard:
+            return "Generate a complex and subtle riddle about a less common but still significant Rishi (sage) or Deva (deity), or a more obscure aspect of a famous one. The riddle should be a real challenge for someone with deep knowledge of Hinduism.";
+        case Difficulty.Medium:
+        default:
+            return "Generate a concise and intriguing riddle about a famous Rishi (sage) or Deva (deity) from the Vedic scriptures. The riddle should be challenging but fair for someone with some knowledge of Hinduism.";
+    }
+}
+
+export const fetchRiddle = async (difficulty: Difficulty): Promise<Riddle> => {
   try {
+    const difficultyPrompt = getDifficultyPrompt(difficulty);
+    const fullPrompt = `You are an expert in Vedic lore. ${difficultyPrompt} Do not mention the figure's name in the riddle. Return the response as a single, valid JSON object with the riddle and the name of the figure.`;
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: "You are an expert in Vedic lore. Generate a concise and intriguing riddle about a famous Rishi (sage) or Deva (deity) from the Vedic scriptures. The riddle should be challenging but fair for someone with some knowledge of Hinduism. Do not mention the figure's name in the riddle. Return the response as a single, valid JSON object with the riddle and the name of the figure.",
+      contents: fullPrompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: riddleSchema,
@@ -53,4 +68,16 @@ export const fetchRiddle = async (): Promise<Riddle> => {
     };
   }
 };
-   
+
+export const fetchHint = async (name: string): Promise<string> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `Give me a short, one-sentence hint for the Vedic figure: ${name}. The hint must not contain the name "${name}".`,
+        });
+        return response.text.trim();
+    } catch (error) {
+        console.error("Error fetching hint from Gemini API:", error);
+        return "Sorry, a hint could not be generated at this time.";
+    }
+};

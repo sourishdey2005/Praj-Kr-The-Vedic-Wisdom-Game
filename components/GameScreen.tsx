@@ -1,37 +1,68 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchRiddle } from '../services/geminiService';
-import { Riddle, Feedback } from '../types';
+import { fetchRiddle, fetchHint } from '../services/geminiService';
+import { Riddle, Feedback, Difficulty } from '../types';
 import LoadingSpinner from './LoadingSpinner';
 import Timer from './Timer';
 import ScorePopup from './ScorePopup';
 
-const TIMER_DURATION = 20; // 20 seconds per riddle
+interface GameScreenProps {
+  difficulty: Difficulty;
+}
 
-const GameScreen: React.FC = () => {
+const difficultySettings = {
+  [Difficulty.Easy]: {
+    timer: 30,
+    basePoints: 15,
+    timeBonus: 3,
+    hintCost: 15,
+  },
+  [Difficulty.Medium]: {
+    timer: 20,
+    basePoints: 10,
+    timeBonus: 5,
+    hintCost: 25,
+  },
+  [Difficulty.Hard]: {
+    timer: 15,
+    basePoints: 5,
+    timeBonus: 7,
+    hintCost: 40,
+  },
+};
+
+const GameScreen: React.FC<GameScreenProps> = ({ difficulty }) => {
   const [currentRiddle, setCurrentRiddle] = useState<Riddle | null>(null);
   const [playerGuess, setPlayerGuess] = useState('');
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(TIMER_DURATION);
+
+  const settings = difficultySettings[difficulty];
+  const [timeLeft, setTimeLeft] = useState(settings.timer);
+
   const [lastPointsWon, setLastPointsWon] = useState<{ points: number; key: number } | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  const [isHintLoading, setIsHintLoading] = useState(false);
+  const [hintUsed, setHintUsed] = useState(false);
 
 
   const getNewRiddle = useCallback(async () => {
     setIsLoading(true);
     setFeedback(null);
     setPlayerGuess('');
-    setTimeLeft(TIMER_DURATION);
+    setTimeLeft(settings.timer);
     setLastPointsWon(null);
-    const riddle = await fetchRiddle();
+    setHint(null);
+    setHintUsed(false);
+    const riddle = await fetchRiddle(difficulty);
     setCurrentRiddle(riddle);
     setIsLoading(false);
-  }, []);
+  }, [difficulty, settings.timer]);
 
   useEffect(() => {
     getNewRiddle();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [getNewRiddle]);
 
   useEffect(() => {
     if (isLoading || feedback) {
@@ -60,13 +91,25 @@ const GameScreen: React.FC = () => {
     const isCorrect = playerGuess.trim().toLowerCase() === currentRiddle.name.toLowerCase();
     
     if (isCorrect) {
-      const pointsAwarded = 10 + (timeLeft * 5); // Base 10 points + 5 points per second left
+      const pointsAwarded = settings.basePoints + (timeLeft * settings.timeBonus);
       setScore(prevScore => prevScore + pointsAwarded);
       setLastPointsWon({ points: pointsAwarded, key: Date.now() });
       setFeedback({ isCorrect: true, message: `Correct! +${pointsAwarded} points. The answer is ${currentRiddle.name}.` });
     } else {
       setFeedback({ isCorrect: false, message: `Not quite. The correct answer was ${currentRiddle.name}.` });
     }
+  };
+
+  const handleHintClick = async () => {
+    if (!currentRiddle || hintUsed) return;
+
+    setIsHintLoading(true);
+    setHintUsed(true);
+    setScore(prev => prev - settings.hintCost);
+    
+    const fetchedHint = await fetchHint(currentRiddle.name);
+    setHint(fetchedHint);
+    setIsHintLoading(false);
   };
 
   const renderContent = () => {
@@ -98,6 +141,12 @@ const GameScreen: React.FC = () => {
           </div>
         )}
 
+        {hint && (
+          <div className="my-4 p-3 bg-indigo-900/50 rounded-lg text-center text-base text-indigo-200 border border-indigo-700">
+            <strong>Hint:</strong> {hint}
+          </div>
+        )}
+
         {feedback ? (
           <div className="text-center mt-8">
             <button onClick={getNewRiddle} className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-500 transition-colors duration-300 transform hover:scale-105">
@@ -106,6 +155,24 @@ const GameScreen: React.FC = () => {
           </div>
         ) : (
           <form onSubmit={handleGuessSubmit} className="mt-8">
+            <div className="flex gap-2 mb-4">
+               <button type="submit" disabled={!playerGuess.trim() || !!feedback} className="w-full px-8 py-3 bg-amber-500 text-gray-900 font-bold text-lg rounded-lg shadow-md hover:bg-amber-400 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors duration-300">
+                Submit Answer
+              </button>
+              <button
+                type="button"
+                onClick={handleHintClick}
+                disabled={hintUsed || isHintLoading || score < settings.hintCost}
+                className="w-1/3 px-4 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors duration-300 flex items-center justify-center"
+                aria-label={`Get a hint for ${settings.hintCost} points`}
+              >
+                {isHintLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <span>Hint (-{settings.hintCost})</span>
+                )}
+              </button>
+            </div>
             <input
               type="text"
               value={playerGuess}
@@ -115,9 +182,6 @@ const GameScreen: React.FC = () => {
               disabled={!!feedback}
               aria-label="Your guess for the riddle"
             />
-            <button type="submit" disabled={!playerGuess.trim() || !!feedback} className="w-full mt-4 px-8 py-3 bg-amber-500 text-gray-900 font-bold text-lg rounded-lg shadow-md hover:bg-amber-400 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors duration-300">
-              Submit Answer
-            </button>
           </form>
         )}
       </div>
@@ -133,7 +197,7 @@ const GameScreen: React.FC = () => {
                     Score: <span className="text-amber-300">{score}</span>
                     {lastPointsWon && <ScorePopup key={lastPointsWon.key} points={lastPointsWon.points} />}
                 </div>
-                {!isLoading && !feedback && <Timer timeLeft={timeLeft} totalTime={TIMER_DURATION} />}
+                {!isLoading && !feedback && <Timer timeLeft={timeLeft} totalTime={settings.timer} />}
             </div>
         </div>
         {renderContent()}
