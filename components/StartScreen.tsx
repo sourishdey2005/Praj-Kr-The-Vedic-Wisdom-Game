@@ -1,6 +1,6 @@
-
-import React, { useState } from 'react';
-import { Difficulty } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Difficulty, HighScore } from '../types';
+import { getHighScores } from '../utils/highscore';
 
 interface StartScreenProps {
   onStart: (difficulty: Difficulty) => void;
@@ -8,6 +8,15 @@ interface StartScreenProps {
 
 const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(Difficulty.Medium);
+  const [highScores, setHighScores] = useState<Record<Difficulty, HighScore[]>>({
+    [Difficulty.Easy]: [],
+    [Difficulty.Medium]: [],
+    [Difficulty.Hard]: [],
+  });
+
+  useEffect(() => {
+    setHighScores(getHighScores());
+  }, []);
 
   const difficultyClasses = (level: Difficulty) => 
     `px-6 py-2 rounded-lg font-semibold transition-all duration-300 transform focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 ${
@@ -15,6 +24,8 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
         ? 'bg-amber-500 text-gray-900 scale-105 shadow-lg' 
         : 'bg-indigo-800 text-indigo-200 hover:bg-indigo-700'
     }`;
+  
+  const hasHighScores = Object.values(highScores).some(scores => scores.length > 0);
 
   return (
     <div className="text-center p-8 bg-black bg-opacity-30 rounded-2xl shadow-2xl backdrop-blur-md border border-indigo-500/30">
@@ -47,6 +58,28 @@ const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
       >
         Begin the Challenge
       </button>
+
+      {hasHighScores && (
+        <div className="mt-12 text-left max-w-lg mx-auto">
+            <h2 className="font-vedic text-3xl text-center text-amber-300 mb-4">High Scores</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Object.entries(highScores).map(([difficulty, scores]) => (
+                    scores.length > 0 && (
+                        <div key={difficulty} className="bg-indigo-900/50 p-4 rounded-lg border border-indigo-700/50">
+                            <h3 className="text-xl font-bold text-indigo-200 text-center mb-2">{difficulty}</h3>
+                            <ol className="list-decimal list-inside text-gray-300 space-y-1">
+                                {scores.map((score, index) => (
+                                    <li key={index}>
+                                        <span className="font-semibold text-amber-300">{score.score}</span> points
+                                    </li>
+                                ))}
+                            </ol>
+                        </div>
+                    )
+                ))}
+            </div>
+        </div>
+      )}
     </div>
   );
 };

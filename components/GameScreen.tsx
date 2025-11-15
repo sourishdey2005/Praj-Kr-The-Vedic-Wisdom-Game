@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchRiddle, fetchHint } from '../services/geminiService';
 import { Riddle, Feedback, Difficulty } from '../types';
+import { saveHighScore } from '../utils/highscore';
 import LoadingSpinner from './LoadingSpinner';
 import Timer from './Timer';
 import ScorePopup from './ScorePopup';
@@ -61,8 +61,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ difficulty }) => {
   }, [difficulty, settings.timer]);
 
   useEffect(() => {
+    // Start the first game
+    setScore(0);
     getNewRiddle();
   }, [getNewRiddle]);
+
+  const handleNext = () => {
+    // If the last answer was wrong (game over), reset the score for a new game.
+    if (feedback && !feedback.isCorrect) {
+        setScore(0);
+    }
+    getNewRiddle();
+  };
 
   useEffect(() => {
     if (isLoading || feedback) {
@@ -71,7 +81,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ difficulty }) => {
 
     if (timeLeft <= 0) {
       if (currentRiddle) { 
-         setFeedback({ isCorrect: false, message: `Time's up! The correct answer was ${currentRiddle.name}.` });
+         saveHighScore(score, difficulty);
+         setFeedback({ isCorrect: false, message: `Time's up! Final Score: ${score}. The answer was ${currentRiddle.name}.` });
       }
       return;
     }
@@ -81,7 +92,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ difficulty }) => {
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [isLoading, feedback, timeLeft, currentRiddle]);
+  }, [isLoading, feedback, timeLeft, currentRiddle, score, difficulty]);
 
 
   const handleGuessSubmit = (e: React.FormEvent) => {
@@ -96,7 +107,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ difficulty }) => {
       setLastPointsWon({ points: pointsAwarded, key: Date.now() });
       setFeedback({ isCorrect: true, message: `Correct! +${pointsAwarded} points. The answer is ${currentRiddle.name}.` });
     } else {
-      setFeedback({ isCorrect: false, message: `Not quite. The correct answer was ${currentRiddle.name}.` });
+      saveHighScore(score, difficulty);
+      setFeedback({ isCorrect: false, message: `Game Over! Your final score: ${score}. The correct answer was ${currentRiddle.name}.` });
     }
   };
 
@@ -149,8 +161,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ difficulty }) => {
 
         {feedback ? (
           <div className="text-center mt-8">
-            <button onClick={getNewRiddle} className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-500 transition-colors duration-300 transform hover:scale-105">
-              Next Riddle
+            <button onClick={handleNext} className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-500 transition-colors duration-300 transform hover:scale-105">
+              {feedback.isCorrect ? 'Next Riddle' : 'Play Again'}
             </button>
           </div>
         ) : (

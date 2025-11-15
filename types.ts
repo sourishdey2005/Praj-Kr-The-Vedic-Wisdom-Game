@@ -1,4 +1,3 @@
-
 export enum GameState {
     Start = 'START',
     Playing = 'PLAYING',
@@ -18,4 +17,9 @@ export interface Riddle {
 export interface Feedback {
     isCorrect: boolean;
     message: string;
+}
+
+export interface HighScore {
+  score: number;
+  difficulty: Difficulty;
 }
